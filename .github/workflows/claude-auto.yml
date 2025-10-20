@@ -3,7 +3,7 @@ name: Claude Auto Commit
 on:
   schedule:
     - cron: "*/10 * * * *" # 每10分钟执行一次
-  workflow_dispatch: # ✅ 与 schedule 同级，缩进 2 个空格
+  workflow_dispatch:
 
 jobs:
   run-claude:
@@ -13,39 +13,52 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # 🧩 检查是否存在 ChatGPT 的审查反馈
+      - name: Check for supervisor feedback
+        run: |
+          if [ -f "logs/review.txt" ]; then
+            echo "🧩 Found supervisor feedback. Sending it to Claude..."
+            export REVIEW_CONTENT=$(cat logs/review.txt | jq -Rs .)
+          else
+            echo "ℹ️ No review found. Using default prompt."
+            export REVIEW_CONTENT="No previous feedback."
+          fi
+          echo "REVIEW_CONTENT=$REVIEW_CONTENT" >> $GITHUB_ENV
+
+      # 🧠 调用 Claude API 生成新结果
       - name: Run Claude API task
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           mkdir -p logs
-          echo "🔍 Sending prompt to Claude..."
-          curl https://api.anthropic.com/v1/messages \
+          echo "🧠 Running Claude with supervisor feedback..."
+          RESPONSE=$(curl https://api.anthropic.com/v1/messages \
             -H "x-api-key: $ANTHROPIC_API_KEY" \
             -H "content-type: application/json" \
             -d '{
-              "model": "claude-3-5-sonnet-20240620",
-              "max_tokens": 1024,
+              "model": "claude-3-sonnet-20240229",
+              "max_tokens": 1000,
               "messages": [
-                {"role": "user", "content": "'"$(cat .ai_tasks/prompt.txt | jq -Rs .)"'"}
+                {"role": "system", "content": "You are an autonomous developer that continuously improves this repository based on feedback from your supervisor."},
+                {"role": "user", "content": "Supervisor feedback:\n'"$REVIEW_CONTENT"'\n\nNow continue improving the project accordingly and describe what you changed."}
               ]
-            }' \
-            | jq -r '.content[0].text' > logs/output.txt
-          echo "✅ Claude response saved to logs/output.txt"
+            }' | jq -r '.content[0].text')
 
+          echo "$RESPONSE" > logs/output.txt
+          echo "✅ Claude output saved to logs/output.txt"
+
+      # 💾 提交并推送结果
       - name: Commit and push results
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           git config user.name "Claude Auto"
           git config user.email "claude@automation.bot"
-
           git add logs/output.txt
           git commit -m "🤖 Auto update via Claude at $(date -u '+%Y-%m-%d %H:%M:%S UTC')" || echo "No changes to commit"
-
-          echo "🔄 Syncing latest main branch..."
-          git pull --rebase https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }} main
-
-          echo "🚀 Pushing updates to main..."
           git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }} main
-
-          echo "✅ Auto commit and push completed successfully!"
