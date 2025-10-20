@@ -2,8 +2,8 @@ name: Claude Auto Commit
 
 on:
   schedule:
-    - cron: "0 */3 * * *"   # run every 3 hours
-  workflow_dispatch:
+    - cron: "0 */3 * * *" # 每 3 小时运行一次
+  workflow_dispatch: # ✅ 与 schedule 同级，缩进 2 个空格
 
 jobs:
   run-claude:
@@ -32,13 +32,20 @@ jobs:
             | jq -r '.content[0].text' > logs/output.txt
           echo "✅ Claude response saved to logs/output.txt"
 
-  - name: Commit and push results
-          env:
-            GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          run: |
-            git config user.name "Claude Auto"
-            git config user.email "claude@automation.bot"
-            git add logs/output.txt
-            git commit -m "🤖 Auto update via Claude at $(date -u '+%Y-%m-%d %H:%M:%S UTC')" || echo "No changes to commit"
-            git pull --rebase https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }} main
-            git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }} main
+      - name: Commit and push results
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          git config user.name "Claude Auto"
+          git config user.email "claude@automation.bot"
+
+          git add logs/output.txt
+          git commit -m "🤖 Auto update via Claude at $(date -u '+%Y-%m-%d %H:%M:%S UTC')" || echo "No changes to commit"
+
+          echo "🔄 Syncing latest main branch..."
+          git pull --rebase https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }} main
+
+          echo "🚀 Pushing updates to main..."
+          git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }} main
+
+          echo "✅ Auto commit and push completed successfully!"
