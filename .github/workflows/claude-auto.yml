@@ -31,12 +31,12 @@ jobs:
                  --input .ai_tasks/prompt.txt \
                  --output logs/output.txt
 
-- name: Commit and push results
-  env:
-    GH_TOKEN: ${{ secrets.GH_TOKEN }}
-  run: |
-    git config user.name "Claude Auto"
-    git config user.email "claude@automation.bot"
-    git add .
-    git commit -m "🤖 auto update via Claude at $(date -u '+%Y-%m-%d %H:%M:%S UTC')" || echo "No changes to commit"
-    git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }} ai-dev
+   - name: Commit and push results
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          git config user.name "Claude Auto"
+          git config user.email "claude@automation.bot"
+          git add .
+          git commit -m "🤖 auto update via Claude at $(date -u '+%Y-%m-%d %H:%M:%S UTC')" || echo "No changes to commit"
+          git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }} ai-dev
