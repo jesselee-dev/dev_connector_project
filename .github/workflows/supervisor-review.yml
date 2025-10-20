@@ -1,0 +1,47 @@
+name: Supervisor Review (ChatGPT)
+
+on:
+  schedule:
+    - cron: "*/15 * * * *" # 每15分钟自动检查 Claude 的输出
+  workflow_dispatch:
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read Claude Output and Send to ChatGPT
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -f "logs/output.txt" ]; then
+            echo "🧠 Sending Claude output to ChatGPT for review..."
+            REVIEW=$(curl https://api.openai.com/v1/chat/completions \
+              -H "Authorization: Bearer $OPENAI_API_KEY" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "model": "gpt-5-turbo",
+                "messages": [
+                  {"role": "system", "content": "You are a strict code reviewer supervising Claude. Your task is to analyze Claude's code and output, detect potential issues, and decide if a new commit should be triggered."},
+                  {"role": "user", "content": "'"$(cat logs/output.txt | jq -Rs .)"'"}
+                ]
+              }' | jq -r '.choices[0].message.content')
+
+            echo "$REVIEW" > logs/review.txt
+            echo "✅ ChatGPT Review saved to logs/review.txt"
+          else
+            echo "⚠️ No Claude output found, skipping review."
+          fi
+
+      - name: Commit and push review
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          git config user.name "Supervisor Bot"
+          git config user.email "supervisor@automation.bot"
+          git add logs/review.txt
+          git commit -m "🧾 Supervisor review by ChatGPT at $(date -u '+%Y-%m-%d %H:%M:%S UTC')" || echo "No new review"
+          git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }} main
