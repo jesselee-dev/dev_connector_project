@@ -1,0 +1,7 @@
+🎯 任务目标：
+阅读 README.md，并改写为更清晰、简洁、专业的版本。
+
+💡 输出要求：
+- 将结果保存为 README.md（直接覆盖原文件）
+- 保留 Markdown 结构
+- 在结尾增加一行：“Updated by Claude via GitHub Actions”
