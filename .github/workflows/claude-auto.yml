@@ -13,23 +13,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install Claude CLI
-        run: |
-          npm install -g @anthropic-ai/claude-cli
-
-      - name: Run Claude task
+      - name: Run Claude API task
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           mkdir -p logs
-          claude --model claude-3-5-sonnet \
-            --input .ai_tasks/prompt.txt \
-            --output logs/output.txt
+          echo "🔍 Sending prompt to Claude..."
+          curl https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "content-type: application/json" \
+            -d '{
+              "model": "claude-3-5-sonnet-20240620",
+              "max_tokens": 1024,
+              "messages": [
+                {"role": "user", "content": "'"$(cat .ai_tasks/prompt.txt | jq -Rs .)"'"}
+              ]
+            }' \
+            | jq -r '.content[0].text' > logs/output.txt
+          echo "✅ Claude response saved to logs/output.txt"
 
       - name: Commit and push results
         env:
@@ -37,6 +38,6 @@ jobs:
         run: |
           git config user.name "Claude Auto"
           git config user.email "claude@automation.bot"
-          git add .
+          git add logs/output.txt
           git commit -m "🤖 Auto update via Claude at $(date -u '+%Y-%m-%d %H:%M:%S UTC')" || echo "No changes to commit"
           git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }} ai-dev
