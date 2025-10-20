@@ -1,0 +1,42 @@
+name: Claude Auto Commit
+
+on:
+  schedule:
+    - cron: "0 */3 * * *" # 每3小时触发一次
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  run-claude:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Claude CLI
+        run: |
+          npm install -g @anthropic-ai/claude-cli
+
+      - name: Run Claude task
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          mkdir -p logs
+          claude --model claude-3-5-sonnet \
+                 --input .ai_tasks/prompt.txt \
+                 --output logs/output.txt
+
+- name: Commit and push results
+  env:
+    GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  run: |
+    git config user.name "Claude Auto"
+    git config user.email "claude@automation.bot"
+    git add .
+    git commit -m "🤖 auto update via Claude at $(date -u '+%Y-%m-%d %H:%M:%S UTC')" || echo "No changes to commit"
+    git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }} ai-dev
