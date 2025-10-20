@@ -2,7 +2,7 @@ name: Claude Auto Commit
 
 on:
   schedule:
-    - cron: "0 */3 * * *" # 每 3 小时运行一次
+    - cron: "*/10 * * * *" # 每10分钟执行一次
   workflow_dispatch: # ✅ 与 schedule 同级，缩进 2 个空格
 
 jobs:
